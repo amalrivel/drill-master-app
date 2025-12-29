@@ -1,77 +1,132 @@
 import type { JPToken } from "@/components/jp-token-text";
 
-// Hiragana + Katakana + "ー"
-const KANA_RE = /^[\u3040-\u309F\u30A0-\u30FFー]+$/;
-
-// Match: sesuatu sebelum "(" + (reading)
-const FURI_RE = /([^\(\)]+?)([\s\u3000]*)\(([^\(\)]+?)\)/g;
-
-// Separator untuk memotong "kata terakhir"
-const SEPARATORS_RE =
-  /[\s\u3000、。．，・！!？?「」『』【】［］〔〕（）\(\)｛｝{}〈〉《》“”"':：；;…‥]/;
-
+/**
+ * Safe furigana parser:
+ * - Prefer Kanji-run immediately before '(' to attach reading.
+ * - Fallback to Japanese-letter run if no Kanji-run found.
+ * - Uses indices slicing (no buffer cutting) so Kanji won't "disappear".
+ * - Outputs JPToken ruby shape: { t:"ruby", base, rt }
+ */
 export function parseParenFurigana(input: string): JPToken[] {
   const s = String(input ?? "");
-  const tokens: JPToken[] = [];
-  let lastIndex = 0;
+  const out: JPToken[] = [];
 
-  for (const m of s.matchAll(FURI_RE)) {
-    const full = m[0];
-    const baseRaw = m[1];      // bisa "では、車"
-    const spaces = m[2] ?? ""; // spasi sebelum "("
-    const rt = m[3];           // reading
-    const start = m.index ?? 0;
+  const isKanji = (ch: string) => {
+    const cp = ch.codePointAt(0) ?? 0;
+    return (
+      (cp >= 0x4e00 && cp <= 0x9fff) ||
+      (cp >= 0x3400 && cp <= 0x4dbf) ||
+      ch === "々"
+    );
+  };
 
-    // kalau reading bukan kana -> anggap bukan furigana
-    if (!KANA_RE.test(rt)) continue;
+  const isKana = (ch: string) => {
+    const cp = ch.codePointAt(0) ?? 0;
+    return (
+      (cp >= 0x3040 && cp <= 0x309f) ||
+      (cp >= 0x30a0 && cp <= 0x30ff) ||
+      ch === "ー"
+    );
+  };
 
-    // text sebelum match
-    if (start > lastIndex) {
-      tokens.push({ t: "text", v: s.slice(lastIndex, start) });
+  const isJapaneseLetter = (ch: string) => isKanji(ch) || isKana(ch);
+
+  const looksLikeReading = (reading: string) => {
+    const r = reading.trim();
+    if (!r) return false;
+
+    let ok = 0;
+    let bad = 0;
+    for (const ch of r) {
+      if (isKana(ch)) ok++;
+      else bad++;
+    }
+    return ok > 0 && bad <= Math.max(1, Math.floor(ok * 0.2));
+  };
+
+  const findKanjiRunStart = (end: number) => {
+    let j = end - 1;
+    if (j < 0) return null;
+    if (!isKanji(s[j])) return null;
+    while (j >= 0 && isKanji(s[j])) j--;
+    return j + 1;
+  };
+
+  const findJapaneseRunStart = (end: number) => {
+    let j = end - 1;
+    if (j < 0) return null;
+    if (!isJapaneseLetter(s[j])) return null;
+    while (j >= 0 && isJapaneseLetter(s[j])) j--;
+    return j + 1;
+  };
+
+  let cursor = 0;
+  let lastEmit = 0;
+
+  while (cursor < s.length) {
+    const openParen = s.indexOf("(", cursor);
+    const openFull = s.indexOf("（", cursor);
+
+    let openIdx = -1;
+    let openChar: "(" | "（" | null = null;
+
+    if (openParen === -1) {
+      openIdx = openFull;
+      openChar = openFull === -1 ? null : "（";
+    } else if (openFull === -1) {
+      openIdx = openParen;
+      openChar = "(";
+    } else {
+      if (openParen < openFull) {
+        openIdx = openParen;
+        openChar = "(";
+      } else {
+        openIdx = openFull;
+        openChar = "（";
+      }
     }
 
-    // Ambil kata terakhir dari baseRaw sebagai base; sisanya prefix text
-    const { prefix, base } = splitTrailingWord(baseRaw);
+    if (openIdx === -1 || openChar == null) break;
 
-    if (prefix) tokens.push({ t: "text", v: prefix });
-    tokens.push({ t: "ruby", base, rt });
+    const closeChar = openChar === "(" ? ")" : "）";
+    const closeIdx = s.indexOf(closeChar, openIdx + 1);
+    if (closeIdx === -1) break;
 
-    // pertahankan spasi sebelum "(" (kalau ada)
-    if (spaces) tokens.push({ t: "text", v: spaces });
+    const readingRaw = s.slice(openIdx + 1, closeIdx);
+    if (!looksLikeReading(readingRaw)) {
+      cursor = openIdx + 1;
+      continue;
+    }
 
-    lastIndex = start + full.length;
+    const kanjiStart = findKanjiRunStart(openIdx);
+    const runStart = kanjiStart ?? findJapaneseRunStart(openIdx);
+
+    if (runStart == null || runStart < lastEmit) {
+      cursor = closeIdx + 1;
+      continue;
+    }
+
+    const base = s.slice(runStart, openIdx);
+    if (!base) {
+      cursor = closeIdx + 1;
+      continue;
+    }
+
+    const plain = s.slice(lastEmit, runStart);
+    if (plain) out.push({ t: "text", v: plain });
+
+    out.push({
+      t: "ruby",
+      base,
+      rt: readingRaw.trim(),
+    });
+
+    lastEmit = closeIdx + 1;
+    cursor = closeIdx + 1;
   }
 
-  // sisa text
-  if (lastIndex < s.length) {
-    tokens.push({ t: "text", v: s.slice(lastIndex) });
-  }
+  const tail = s.slice(lastEmit);
+  if (tail) out.push({ t: "text", v: tail });
 
-  return mergeTextTokens(tokens);
-}
-
-function splitTrailingWord(baseRaw: string): { prefix: string; base: string } {
-  let i = baseRaw.length - 1;
-
-  // skip separators di ujung
-  while (i >= 0 && SEPARATORS_RE.test(baseRaw[i])) i--;
-
-  // ambil kata terakhir (run karakter non-separator)
-  const end = i;
-  while (i >= 0 && !SEPARATORS_RE.test(baseRaw[i])) i--;
-
-  const prefix = baseRaw.slice(0, i + 1);
-  const base = baseRaw.slice(i + 1, end + 1);
-
-  return { prefix, base };
-}
-
-function mergeTextTokens(tokens: JPToken[]): JPToken[] {
-  const out: JPToken[] = [];
-  for (const t of tokens) {
-    const prev = out[out.length - 1];
-    if (t.t === "text" && prev?.t === "text") prev.v += t.v;
-    else out.push({ ...t });
-  }
   return out;
 }

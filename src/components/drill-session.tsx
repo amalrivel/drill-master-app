@@ -34,11 +34,11 @@ function totalItemsCount(questions: TFQuestion[]) {
 function firstUnansweredIndex(deck: TFQuestion[], answered: Set<string>, startIdx: number): number {
   let i = Math.max(0, startIdx);
   while (i < deck.length && answered.has(deck[i].id)) i++;
-  return i; // bisa == deck.length (artinya selesai)
+  return i; // bisa == deck.length (selesai)
 }
 
 type Props = {
-  topicKey: string;     // "__all__" atau normalized topic
+  topicKey: string;     // session key (boleh gabungan source/topic)
   topicLabel: string;   // label tampilan
   questions: TFQuestion[];
 };
@@ -63,7 +63,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
   // local stats cache
   const statsRef = React.useRef<StatsStore>({});
 
-  // per-step UI state (untuk feedback setelah jawab)
+  // per-step UI state
   const [singleAnswered, setSingleAnswered] = React.useState<{
     picked?: boolean;
     isCorrect?: boolean;
@@ -97,7 +97,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
       saveSession({
         v: 1,
         topicKey,
-        createdAt: Date.now(), // refresh TTL on activity
+        createdAt: Date.now(),
         deckIds: deckNow.map((q) => q.id),
         idx: idxNow,
         answeredSetIds: Array.from(answeredNow),
@@ -108,12 +108,6 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
     },
     [topicKey, deck, idx, answeredSetIds, correctCount, wrongItemIds, showFurigana]
   );
-
-  const goToNextUnanswered = (startFrom: number, answered: Set<string>, deckArr: TFQuestion[]) => {
-    const nextIdx = firstUnansweredIndex(deckArr, answered, startFrom);
-    setIdx(nextIdx);
-    persist({ deck: deckArr, idx: nextIdx, answeredSetIds: answered });
-  };
 
   const next = () => {
     // reset per-step UI state
@@ -175,28 +169,30 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
     // no session -> create new
     const newDeck = shuffle(baseQuestions);
     const answered = new Set<string>();
-    const startIdx = 0;
 
     setDeck(newDeck);
     setAnsweredSetIds(answered);
-    setIdx(startIdx);
+    setIdx(0);
+
     setCorrectCount(0);
     setWrongItemIds([]);
     setShowFurigana(true);
+
     setSingleAnswered({});
     setGroupAnswers({});
     setGroupSubmitted(false);
 
-    const newSnap = newSessionSnapshot({
-      topicKey,
-      deckIds: newDeck.map((q) => q.id),
-      idx: 0,
-      answeredSetIds: [],
-      correctCount: 0,
-      wrongItemIds: [],
-      showFurigana: true,
-    });
-    saveSession(newSnap);
+    saveSession(
+      newSessionSnapshot({
+        topicKey,
+        deckIds: newDeck.map((q) => q.id),
+        idx: 0,
+        answeredSetIds: [],
+        correctCount: 0,
+        wrongItemIds: [],
+        showFurigana: true,
+      })
+    );
 
     setReady(true);
   }, [topicKey, baseQuestions]);
@@ -205,21 +201,13 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
   React.useEffect(() => {
     if (!ready) return;
     persist({ showFurigana });
-  }, [showFurigana]);
+  }, [showFurigana, ready]);
 
   // clear session at finish (optional)
   React.useEffect(() => {
     if (!ready) return;
     if (isFinished) clearSession(topicKey);
   }, [ready, isFinished, topicKey]);
-
-  const markSetAnswered = (setId: string) => {
-    setAnsweredSetIds((prev) => {
-      const n = new Set(prev);
-      n.add(setId);
-      return n;
-    });
-  };
 
   const answerSingle = (user: boolean, item: TFItem) => {
     if (!current) return;
@@ -312,23 +300,41 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
     }
 
     const answered = new Set<string>();
+
     setDeck(newDeck);
     setAnsweredSetIds(answered);
+    setIdx(0);
+
     setCorrectCount(0);
     setWrongItemIds([]);
+
     setSingleAnswered({});
     setGroupAnswers({});
     setGroupSubmitted(false);
 
-    goToNextUnanswered(0, answered, newDeck);
+    persist({
+      deck: newDeck,
+      idx: 0,
+      answeredSetIds: answered,
+      correctCount: 0,
+      wrongItemIds: [],
+    });
   };
 
   const renderTFButtons = (onPick: (val: boolean) => void, disabled?: boolean) => (
     <div className="flex gap-2">
-      <button className="flex-1 rounded-xl border px-4 py-3 hover:bg-muted disabled:opacity-50" onClick={() => onPick(true)} disabled={disabled}>
+      <button
+        className="flex-1 rounded-xl border px-4 py-3 hover:bg-muted disabled:opacity-50"
+        onClick={() => onPick(true)}
+        disabled={disabled}
+      >
         〇
       </button>
-      <button className="flex-1 rounded-xl border px-4 py-3 hover:bg-muted disabled:opacity-50" onClick={() => onPick(false)} disabled={disabled}>
+      <button
+        className="flex-1 rounded-xl border px-4 py-3 hover:bg-muted disabled:opacity-50"
+        onClick={() => onPick(false)}
+        disabled={disabled}
+      >
         ✕
       </button>
     </div>
@@ -343,7 +349,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
   }
 
   if (!questions.length) {
-    return <div className="rounded-2xl border p-4">Tidak ada soal untuk topic ini.</div>;
+    return <div className="rounded-2xl border p-4">Tidak ada soal untuk filter ini.</div>;
   }
 
   if (isFinished) {
@@ -368,7 +374,11 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
           <button className="flex-1 rounded-xl border px-4 py-3 hover:bg-muted" onClick={() => restart("all")}>
             Ulangi semua
           </button>
-          <button className="flex-1 rounded-xl border px-4 py-3 hover:bg-muted disabled:opacity-50" onClick={() => restart("wrong")} disabled={wrongItemIds.length === 0}>
+          <button
+            className="flex-1 rounded-xl border px-4 py-3 hover:bg-muted disabled:opacity-50"
+            onClick={() => restart("wrong")}
+            disabled={wrongItemIds.length === 0}
+          >
             Ulangi yang salah
           </button>
         </div>
@@ -397,13 +407,12 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
       </div>
 
       <div className="rounded-2xl border p-5 space-y-4">
-        {("prompt" in current && current.prompt) ? (
+        {"prompt" in current && current.prompt ? (
           <JPTokenText tokens={current.prompt} showFurigana={showFurigana} className="text-lg leading-relaxed" />
         ) : null}
 
         {current.imageUrl ? <QuestionImage imageUrl={current.imageUrl} /> : null}
 
-        {/* kalau sudah answered via restore, beri hint */}
         {alreadyAnsweredThisSet ? (
           <div className="rounded-xl border p-3 text-sm text-muted-foreground">
             Set ini sudah dijawab. Tekan <span className="font-medium">Next</span> untuk lanjut.
@@ -418,21 +427,27 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
 
             {singleAnswered.picked ? (
               <div className="space-y-3">
-                <div className={["rounded-xl border p-3 text-sm", singleAnswered.isCorrect ? "border-green-600/40" : "border-red-600/40"].join(" ")}>
+                <div
+                  className={[
+                    "rounded-xl border p-3 text-sm",
+                    singleAnswered.isCorrect ? "border-green-600/40" : "border-red-600/40",
+                  ].join(" ")}
+                >
                   {singleAnswered.isCorrect ? "Benar ✅" : "Salah ❌"} — Jawaban:{" "}
                   <span className="font-medium">{current.item.correct ? "〇" : "✕"}</span>
                 </div>
 
-                {(current.explanation || current.ref) ? (
+                {(current.item.explanation || current.item.ref) ? (
                   <div className="rounded-xl border p-3 space-y-2">
-                    {current.ref ? <div className="text-xs text-muted-foreground">Ref: {current.ref}</div> : null}
-                    {current.explanation ? <JPTokenText tokens={current.explanation} showFurigana={showFurigana} className="text-sm leading-relaxed" /> : null}
+                    {current.item.ref ? <div className="text-xs text-muted-foreground">Ref: {current.item.ref}</div> : null}
+                    {current.item.explanation ? (
+                      <JPTokenText tokens={current.item.explanation} showFurigana={showFurigana} className="text-sm leading-relaxed" />
+                    ) : null}
                   </div>
                 ) : null}
               </div>
             ) : null}
 
-            {/* ✅ FIX: Next boleh kalau alreadyAnsweredThisSet */}
             <button
               className="w-full rounded-xl border px-4 py-3 hover:bg-muted disabled:opacity-50"
               onClick={next}
@@ -473,9 +488,23 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
                     </div>
 
                     {groupSubmitted ? (
-                      <div className={["rounded-lg border p-2 text-sm", isCorrect ? "border-green-600/40" : "border-red-600/40"].join(" ")}>
-                        {isCorrect ? "Benar ✅" : "Salah ❌"} — Jawaban:{" "}
-                        <span className="font-medium">{it.correct ? "〇" : "✕"}</span>
+                      <div className="space-y-2">
+                        <div
+                          className={["rounded-lg border p-2 text-sm", isCorrect ? "border-green-600/40" : "border-red-600/40"].join(" ")}
+                        >
+                          {isCorrect ? "Benar ✅" : "Salah ❌"} — Jawaban:{" "}
+                          <span className="font-medium">{it.correct ? "〇" : "✕"}</span>
+                        </div>
+
+                        {/* ✅ explanation/ref per item */}
+                        {(it.explanation || it.ref) ? (
+                          <div className="rounded-lg border p-2 space-y-1">
+                            {it.ref ? <div className="text-xs text-muted-foreground">Ref: {it.ref}</div> : null}
+                            {it.explanation ? (
+                              <JPTokenText tokens={it.explanation} showFurigana={showFurigana} className="text-sm leading-relaxed" />
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <div className="text-xs text-muted-foreground">{isAnswered ? "Dipilih" : "Belum dijawab"}</div>
@@ -494,21 +523,12 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
                 Submit
               </button>
             ) : (
-              <div className="space-y-3">
-                {(current.explanation || current.ref) ? (
-                  <div className="rounded-xl border p-3 space-y-2">
-                    {current.ref ? <div className="text-xs text-muted-foreground">Ref: {current.ref}</div> : null}
-                    {current.explanation ? <JPTokenText tokens={current.explanation} showFurigana={showFurigana} className="text-sm leading-relaxed" /> : null}
-                  </div>
-                ) : null}
-
-                <button className="w-full rounded-xl border px-4 py-3 hover:bg-muted" onClick={next}>
-                  Next
-                </button>
-              </div>
+              <button className="w-full rounded-xl border px-4 py-3 hover:bg-muted" onClick={next}>
+                Next
+              </button>
             )}
 
-            {/* ✅ FIX tambahan: kalau restore sudah answered, tetap sediakan Next */}
+            {/* extra safety: kalau restore sudah answered tapi groupSubmitted=false */}
             {alreadyAnsweredThisSet && !groupSubmitted ? (
               <button className="w-full rounded-xl border px-4 py-3 hover:bg-muted" onClick={next}>
                 Next
