@@ -5,6 +5,7 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4">
       <Button><Link href="/practice">Practice</Link></Button>
+      <Button><Link href="/dev-preview">Dev Preview</Link></Button>
     </div>
   );
 }

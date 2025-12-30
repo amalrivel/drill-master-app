@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { JPToken } from "@/components/jp-token-text";
 import { parseParenFurigana } from "@/lib/parse-paren-furigana";
 import { fetchSheetRows } from "@/lib/gsheet-api";

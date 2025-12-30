@@ -1,37 +1,22 @@
 import { getQuestions } from "@/lib/questions";
-import { JPTokenText } from "@/components/jp-token-text";
-import { QuestionImage } from "@/components/question-image";
+import { DevPreviewClient } from "@/components/dev-preview-client";
 
-export default async function Page() {
+export default async function DevPreviewPage() {
   const questions = await getQuestions();
 
   return (
-    <div className="p-6 space-y-6">
-      {questions.slice(0, 10).map((q) => (
-        <div key={q.id} className="rounded-2xl border p-4 space-y-3">
-          <div className="text-sm opacity-70">
-            {q.kind} — {q.id}
-          </div>
+    <div className="p-6 space-y-4">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold">Dev Preview</h1>
+        <p className="text-sm text-muted-foreground">
+          Search soal berdasarkan <span className="font-medium">id</span> (contoh:{" "}
+          <span className="font-medium">Q-0227</span>,{" "}
+          <span className="font-medium">SET-0001</span>, atau item seperti{" "}
+          <span className="font-medium">SET-0001-2</span>).
+        </p>
+      </div>
 
-          {"prompt" in q && q.prompt ? (
-            <JPTokenText tokens={q.prompt} className="text-lg leading-relaxed" />
-          ) : null}
-
-          {q.imageUrl ? <QuestionImage imageUrl={q.imageUrl} /> : null}
-
-          {q.kind === "tf_single" ? (
-            <JPTokenText tokens={q.item.statement} className="text-base leading-relaxed" />
-          ) : (
-            <ol className="list-decimal pl-5 space-y-2">
-              {q.items.map((it) => (
-                <li key={it.id}>
-                  <JPTokenText tokens={it.statement} as="span" className="text-base leading-relaxed" />
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      ))}
+      <DevPreviewClient questions={questions} />
     </div>
   );
 }
