@@ -51,13 +51,13 @@ function TFItemBlock({
         <div className="text-sm font-semibold">{it.correct ? "〇" : "✕"}</div>
       </div>
 
-      <JPTokenText tokens={it.statement} showFurigana={showFurigana} className="text-base leading-relaxed" />
+      <JPTokenText tokens={it.statement} showFurigana={showFurigana} className="text-lg md:text-xl leading-relaxed" />
 
       {(it.explanation || it.ref) ? (
         <div className="rounded-lg border p-2 space-y-1">
           <MetaRow label="Ref" value={it.ref ?? ""} />
           {it.explanation ? (
-            <JPTokenText tokens={it.explanation} showFurigana={showFurigana} className="text-sm leading-relaxed" />
+            <JPTokenText tokens={it.explanation} showFurigana={showFurigana} className="text-base md:text-lg leading-relaxed" />
           ) : null}
         </div>
       ) : null}
@@ -99,7 +99,7 @@ function QuestionCard({
       {"prompt" in q && q.prompt ? (
         <div className="space-y-2">
           <div className="text-sm font-medium">Prompt</div>
-          <JPTokenText tokens={q.prompt} showFurigana={showFurigana} className="text-base leading-relaxed" />
+          <JPTokenText tokens={q.prompt} showFurigana={showFurigana} className="text-lg md:text-xl leading-relaxed" />
         </div>
       ) : null}
 

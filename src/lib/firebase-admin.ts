@@ -1,7 +1,7 @@
 import "server-only";
 import admin from "firebase-admin";
 
-function getServiceAccount() {
+function loadServiceAccount() {
   const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
   if (b64) {
     const json = Buffer.from(b64, "base64").toString("utf8");
@@ -9,18 +9,20 @@ function getServiceAccount() {
   }
 
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON");
-
-  const sa = JSON.parse(raw);
-  if (typeof sa.private_key === "string") {
-    sa.private_key = sa.private_key.replace(/\\n/g, "\n");
+  if (raw) {
+    const sa = JSON.parse(raw);
+    if (typeof sa.private_key === "string") {
+      sa.private_key = sa.private_key.replace(/\\n/g, "\n");
+    }
+    return sa;
   }
-  return sa;
+
+  throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_B64 or FIREBASE_SERVICE_ACCOUNT_JSON");
 }
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(getServiceAccount()),
+    credential: admin.credential.cert(loadServiceAccount()),
   });
 }
 
