@@ -39,8 +39,8 @@ export function JPTokenText({
             <rt
               className={
                 showFurigana
-                  ? "text-[0.65em] leading-none opacity-80 select-none"
-                  : "text-[0.65em] leading-none opacity-0 select-none"
+                  ? "text-[0.72em] md:text-[0.68em] leading-none opacity-80 select-none"
+                  : "text-[0.72em] md:text-[0.68em] leading-none opacity-0 select-none"
               }
             >
               {tok.rt}

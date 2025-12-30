@@ -408,7 +408,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
 
       <div className="rounded-2xl border p-5 space-y-4">
         {"prompt" in current && current.prompt ? (
-          <JPTokenText tokens={current.prompt} showFurigana={showFurigana} className="text-lg leading-relaxed" />
+          <JPTokenText tokens={current.prompt} showFurigana={showFurigana} className="text-lg md:text-xl leading-relaxed" />
         ) : null}
 
         {current.imageUrl ? <QuestionImage imageUrl={current.imageUrl} /> : null}
@@ -421,7 +421,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
 
         {current.type === "tf_single" ? (
           <div className="space-y-4">
-            <JPTokenText tokens={current.item.statement} showFurigana={showFurigana} className="text-base leading-relaxed" />
+            <JPTokenText tokens={current.item.statement} showFurigana={showFurigana} className="text-lg md:text-xl leading-relaxed" />
 
             {renderTFButtons((val) => answerSingle(val, current.item), !!singleAnswered.picked || alreadyAnsweredThisSet)}
 
@@ -441,7 +441,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
                   <div className="rounded-xl border p-3 space-y-2">
                     {current.item.ref ? <div className="text-xs text-muted-foreground">Ref: {current.item.ref}</div> : null}
                     {current.item.explanation ? (
-                      <JPTokenText tokens={current.item.explanation} showFurigana={showFurigana} className="text-sm leading-relaxed" />
+                      <JPTokenText tokens={current.item.explanation} showFurigana={showFurigana} className="text-base md:text-lg leading-relaxed" />
                     ) : null}
                   </div>
                 ) : null}
@@ -468,7 +468,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
                   <li key={it.id} className="rounded-xl border p-3 space-y-3">
                     <div className="text-sm text-muted-foreground">({i + 1})</div>
 
-                    <JPTokenText tokens={it.statement} showFurigana={showFurigana} className="text-base leading-relaxed" />
+                    <JPTokenText tokens={it.statement} showFurigana={showFurigana} className="text-lg md:text-xl leading-relaxed" />
 
                     <div className="flex gap-2">
                       <button
@@ -501,7 +501,7 @@ export function DrillSession({ topicKey, topicLabel, questions }: Props) {
                           <div className="rounded-lg border p-2 space-y-1">
                             {it.ref ? <div className="text-xs text-muted-foreground">Ref: {it.ref}</div> : null}
                             {it.explanation ? (
-                              <JPTokenText tokens={it.explanation} showFurigana={showFurigana} className="text-sm leading-relaxed" />
+                              <JPTokenText tokens={it.explanation} showFurigana={showFurigana} className="text-base md:text-lg leading-relaxed" />
                             ) : null}
                           </div>
                         ) : null}
