@@ -6,35 +6,32 @@ type SheetResponse = { ok?: boolean; rows?: any[]; error?: string };
 const SCRIPT_URL = process.env.APPS_SCRIPT_URL!;
 const SCRIPT_TOKEN = process.env.APPS_SCRIPT_TOKEN!;
 
-// simple in-memory cache (per server instance)
 let cache: { at: number; rows: any[] } | null = null;
 const TTL_MS = 10 * 60 * 1000; // 10 menit
 
-export async function fetchSheetRows(): Promise<{ rows: any[] }> {
+export function invalidateSheetCache() {
+  cache = null;
+}
+
+export async function fetchSheetRows(opts?: { force?: boolean }): Promise<{ rows: any[] }> {
+  const force = Boolean(opts?.force);
+
   if (!SCRIPT_URL) throw new Error("Missing APPS_SCRIPT_URL");
   if (!SCRIPT_TOKEN) throw new Error("Missing APPS_SCRIPT_TOKEN");
 
   const now = Date.now();
-  if (cache && now - cache.at < TTL_MS) {
+  if (!force && cache && now - cache.at < TTL_MS) {
     return { rows: cache.rows };
   }
 
   const url = new URL(SCRIPT_URL);
   url.searchParams.set("token", SCRIPT_TOKEN);
 
-  const res = await fetch(url.toString(), {
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    throw new Error(`Apps Script HTTP ${res.status}`);
-  }
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  if (!res.ok) throw new Error(`Apps Script HTTP ${res.status}`);
 
   const data = (await res.json()) as SheetResponse;
-
   if (data?.ok === false) {
-    // jangan log token, cukup status
-    console.warn("Apps Script rejected request:", data.error ?? "unknown");
     throw new Error(`Apps Script rejected request: ${data.error ?? "unknown"}`);
   }
 
