@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getQuestions } from "@/lib/questions";
 import { normalizeSource, normalizeTopic, sourceLabel, topicLabel } from "@/lib/topic";
+import { SyncQuestionsButton } from "@/components/sync-questions-button";
+import { ResetAllProgressButton } from "@/components/reset-all-progress-button";
 
 type Bucket = {
   sourceKey: string;
@@ -84,6 +86,10 @@ export default async function PracticePage() {
     <div className="p-6 space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Practice</h1>
+        <div className="flex items-center gap-2">
+          <SyncQuestionsButton />
+          <ResetAllProgressButton />
+        </div>
         <p className="text-sm text-muted-foreground">
           Pilih source dan (opsional) topic untuk mulai latihan ○/✕.
         </p>
